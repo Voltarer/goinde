@@ -1,0 +1,73 @@
+import { StyleSheet } from 'react-native';
+
+export const FormStyles = StyleSheet.create({
+    container2: {
+        flex: 1,
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        position: 'relative',
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+        width: 300,
+        padding: 20,
+        backgroundColor: 'white',
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        padding: 10,
+        width: '100%',
+        marginBottom: 20,
+    },
+    addButton: {
+        backgroundColor: 'green',
+        padding: 10,
+        borderRadius: 5,
+        marginBottom: 10,
+    },
+    closeButton: {
+        backgroundColor: 'red',
+        padding: 10,
+        borderRadius: 5,
+    },
+    buttonText: {
+        color: 'white',
+        fontWeight: 'bold',
+    },
+    floatingButton: {
+        position: 'absolute',
+        bottom: 50,
+        right: 10,
+        backgroundColor: 'red',
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+    },
+    flex1: {
+        flex: 1,
+        marginRight: 10, // Добавляет отступ между полем ввода и кнопками
+    },
+    dateButton: {
+        padding: 10,
+        backgroundColor: '#ddd',
+        borderRadius: 5,
+        marginRight: 10, // Добавляет отступ между кнопками
+    },
+});
