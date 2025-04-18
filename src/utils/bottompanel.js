@@ -9,10 +9,15 @@ export default function BottomNav({ setView }) {
         <Icon name="calendar" size={20} color="white" />
         <Text style={styles.navText}>Сегодня</Text>
       </TouchableOpacity>
-      
+
       <TouchableOpacity style={styles.navButton} onPress={() => setView('upcoming')}>
         <Icon name="calendar-o" size={20} color="white" />
         <Text style={styles.navText}>Предстоящее</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.navButton} onPress={() => setView('past')}>
+        <Icon name="history" size={20} color="white" />
+        <Text style={styles.navText}>Прошедшие</Text>
       </TouchableOpacity>
     </View>
   );
@@ -23,7 +28,7 @@ const styles = {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    backgroundColor: '#333', // Темный фон, как в примере
+    backgroundColor: '#333',
     height: 60,
     position: 'absolute',
     bottom: 0,

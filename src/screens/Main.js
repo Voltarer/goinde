@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, FlatList, Text, StatusBar } from 'react-native';
+import { View, FlatList, Text, StatusBar, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import ListItem from '../components/ListItem';
 import Form from '../components/Form';
 import { getCurrentDate } from '../utils/getCurrentDate';
@@ -11,6 +12,9 @@ export default function Main() {
   const [listOfItems, setListOfItems] = useState([]);
   const [currentDate, setCurrentDate] = useState('');
   const [view, setView] = useState('today');
+  const [editTaskKey, setEditTaskKey] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
     const loadData = async () => {
@@ -69,6 +73,21 @@ export default function Main() {
     );
   };
 
+  const onEditDate = (key) => {
+    setEditTaskKey(key);
+    setModalVisible(true);
+  };
+
+  const updateTaskDate = (key, newDate) => {
+    const formattedDate = newDate.toLocaleDateString('ru-RU');
+    setListOfItems(prevList =>
+      prevList.map(task =>
+        task.key === key ? { ...task, date: formattedDate } : task
+      )
+    );
+    setModalVisible(false);
+  };
+
   const today = new Date();
   const todayDateString = today.toLocaleDateString('ru-RU');
 
@@ -79,6 +98,7 @@ export default function Main() {
         const taskDate = new Date(task.date.split('.').reverse().join('-'));
         if (view === 'today') return task.date === todayDateString;
         if (view === 'upcoming') return taskDate > today;
+        if (view === 'past') return taskDate < today;
         return true;
       })
       .sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite));
@@ -90,12 +110,12 @@ export default function Main() {
       acc[task.date].push(task);
       return acc;
     }, {});
-      
+
     return groups;
   }, [filteredTasks]);
-  
+
   const upcomingList = useMemo(() => {
-    return Object.entries(groupedTasks) // Используем `Object.entries` вместо `Object.keys`
+    return Object.entries(groupedTasks)
       .sort(([dateA], [dateB]) => new Date(dateA.split('.').reverse().join('-')) - new Date(dateB.split('.').reverse().join('-')))
       .map(([date, tasks]) => ({ date, tasks }));
   }, [groupedTasks]);
@@ -105,23 +125,24 @@ export default function Main() {
       <StatusBar barStyle="light-content" backgroundColor="#010a0a" />
       <View style={globalStyles.Header}>
         <Text style={globalStyles.HeaderText}>
-          {view === 'today' ? 'Сегодня' : 'Предстоящее'}
+          {view === 'today' ? 'Сегодня' : view === 'upcoming' ? 'Предстоящее' : 'Прошедшие'}
         </Text>
       </View>
       {view === 'today' && <Text style={globalStyles.dateText}>{currentDate}</Text>}
       {view === 'today' ? (
-        <FlatList 
-          data={filteredTasks} 
+        <FlatList
+          data={filteredTasks}
           extraData={listOfItems}
-          ListFooterComponent={<View style={{ height: 125 }} />} // Добавляем место внизу
+          ListFooterComponent={<View style={{ height: 125 }} />}
           renderItem={({ item }) => (
-            <ListItem 
-              el={item} 
-              deleteHandler={deleteHandler} 
-              onToggleFavorite={toggleFavoriteHandler} 
+            <ListItem
+              el={item}
+              deleteHandler={deleteHandler}
+              onToggleFavorite={toggleFavoriteHandler}
+              onEditDate={onEditDate}
             />
           )}
-          keyExtractor={(item) => item.key} 
+          keyExtractor={(item) => item.key}
         />
       ) : (
         <FlatList
@@ -129,14 +150,15 @@ export default function Main() {
           extraData={listOfItems}
           ListFooterComponent={<View style={{ height: 125 }} />}
           renderItem={({ item, index }) => (
-            <View style={{ marginTop: index === 0 ? 20 : 0 }}> 
+            <View style={{ marginTop: index === 0 ? 20 : 0 }}>
               <Text style={globalStyles.upcomingDate}>{item.date}</Text>
               {item.tasks.map(task => (
-                <ListItem 
-                  key={task.key} 
-                  el={task} 
-                  deleteHandler={deleteHandler} 
-                  onToggleFavorite={toggleFavoriteHandler} 
+                <ListItem
+                  key={task.key}
+                  el={task}
+                  deleteHandler={deleteHandler}
+                  onToggleFavorite={toggleFavoriteHandler}
+                  onEditDate={onEditDate}
                 />
               ))}
             </View>
@@ -148,6 +170,22 @@ export default function Main() {
         <Form addHandler={addHandler} view={view} />
       </View>
       <BottomNav setView={setView} />
+
+      {modalVisible && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="default"
+          onChange={(event, date) => {
+            if (date) {
+              setSelectedDate(date);
+              updateTaskDate(editTaskKey, date);
+            } else {
+              setModalVisible(false);
+            }
+          }}
+        />
+      )}
     </View>
   );
 }

@@ -55,6 +55,7 @@ export const filterTasks = (listOfItems, view, todayDateString, today) => {
       const taskDate = new Date(task.date.split('.').reverse().join('-'));
       if (view === 'today') return task.date === todayDateString;
       if (view === 'upcoming') return taskDate > today;
+      if (view === 'past') return taskDate < today;
       return true;
     })
     .sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite));
