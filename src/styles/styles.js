@@ -5,7 +5,7 @@ export const globalStyles = StyleSheet.create({
   main: {
     width:'100%',
     height:'100%',
-    backgroundColor: '#010a0a',
+    backgroundColor: '#121C2C',
   },
   dateText: {
     fontSize: 28,
@@ -17,8 +17,7 @@ export const globalStyles = StyleSheet.create({
   Header: {
     paddingTop: 30,
     height: 60,
-    backgroundColor: '#010a0a',
-    marginLeft: 15,
+    paddingLeft:15,
   },
   HeaderText: {
     fontSize: 25,
@@ -44,6 +43,9 @@ export const globalStyles = StyleSheet.create({
   },
   textContainer: {
     flex: 1,
+    fontSize: 24,
+    flexWrap: 'wrap',
+    color:'white',
   },
   text: {
     fontSize: 24,

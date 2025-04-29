@@ -1,8 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { useNavigation } from '@react-navigation/native';
 
 export default function BottomNav({ setView }) {
+  const navigation = useNavigation();
+
   return (
     <View style={styles.navContainer}>
       <TouchableOpacity style={styles.navButton} onPress={() => setView('today')}>
@@ -15,10 +18,11 @@ export default function BottomNav({ setView }) {
         <Text style={styles.navText}>Предстоящее</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.navButton} onPress={() => setView('past')}>
-        <Icon name="history" size={20} color="white" />
-        <Text style={styles.navText}>Прошедшие</Text>
+      <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('Account')}>
+        <Icon name="user" size={20} color="white" />
+        <Text style={styles.navText}>Аккаунт</Text>
       </TouchableOpacity>
+
     </View>
   );
 }
@@ -26,9 +30,9 @@ export default function BottomNav({ setView }) {
 const styles = {
   navContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#333',
+    backgroundColor: '#2C2C2C',
     height: 60,
     position: 'absolute',
     bottom: 0,

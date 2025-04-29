@@ -46,10 +46,10 @@ export const FormStyles = StyleSheet.create({
         position: 'absolute',
         bottom: 50,
         right: 10,
-        backgroundColor: 'red',
+        backgroundColor: '#FF3B30', //основной цвет кнопки
         width: 60,
         height: 60,
-        borderRadius: 30,
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 5,
@@ -69,5 +69,13 @@ export const FormStyles = StyleSheet.create({
         backgroundColor: '#ddd',
         borderRadius: 5,
         marginRight: 10, // Добавляет отступ между кнопками
+    },
+    input2:{
+        borderWidth: 1,
+        borderColor: "red",
+        padding: 10,
+        height:'50%',
+        width: '100%',
+        marginBottom: 20,
     },
 });

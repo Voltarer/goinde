@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, FlatList, Text, StatusBar, Modal } from 'react-native';
+import { View, FlatList, Text, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import ListItem from '../components/ListItem';
@@ -7,6 +7,10 @@ import Form from '../components/Form';
 import { getCurrentDate } from '../utils/getCurrentDate';
 import BottomNav from '../utils/bottompanel';
 import { globalStyles } from '../styles/styles';
+import Icon from 'react-native-vector-icons/Feather';
+import { useNavigation } from '@react-navigation/native';
+import FlashMessage, { showMessage } from 'react-native-flash-message';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Main() {
   const [listOfItems, setListOfItems] = useState([]);
@@ -15,6 +19,9 @@ export default function Main() {
   const [editTaskKey, setEditTaskKey] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const navigation = useNavigation();
+  const { isDarkTheme, themeStyles } = useTheme();
 
   useEffect(() => {
     const loadData = async () => {
@@ -52,14 +59,30 @@ export default function Main() {
 
   const addHandler = (text, date) => {
     if (!text.trim()) return;
+  
+    const formattedDate =
+      typeof date === 'string'
+        ? date
+        : date.toLocaleDateString('ru-RU');
+  
     const newTask = {
       key: Date.now().toString(),
       text,
-      date,
+      date: formattedDate,
       isFavorite: false,
     };
+  
     setListOfItems((prevList) => [...prevList, newTask]);
+  
+    showMessage({
+      message: 'Задача добавлена!',
+      description: `"${text}" успешно создана`,
+      type: 'success',
+      icon: 'success',
+      duration: 1500,
+    });
   };
+  
 
   const deleteHandler = (key) => {
     setListOfItems((prevList) => prevList.filter(task => task.key !== key));
@@ -89,20 +112,22 @@ export default function Main() {
   };
 
   const today = new Date();
-  const todayDateString = today.toLocaleDateString('ru-RU');
 
   const filteredTasks = useMemo(() => {
     return listOfItems
       .filter(task => {
         if (!task.date) return false;
+  
         const taskDate = new Date(task.date.split('.').reverse().join('-'));
-        if (view === 'today') return task.date === todayDateString;
+        const isSameDay = taskDate.toDateString() === today.toDateString();
+  
+        if (view === 'today') return isSameDay || taskDate < today;
         if (view === 'upcoming') return taskDate > today;
-        if (view === 'past') return taskDate < today;
         return true;
       })
       .sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite));
   }, [listOfItems, view]);
+  
 
   const groupedTasks = useMemo(() => {
     const groups = filteredTasks.reduce((acc, task) => {
@@ -110,39 +135,94 @@ export default function Main() {
       acc[task.date].push(task);
       return acc;
     }, {});
-
     return groups;
   }, [filteredTasks]);
 
   const upcomingList = useMemo(() => {
     return Object.entries(groupedTasks)
-      .sort(([dateA], [dateB]) => new Date(dateA.split('.').reverse().join('-')) - new Date(dateB.split('.').reverse().join('-')))
+      .sort(([dateA], [dateB]) =>
+        new Date(dateA.split('.').reverse().join('-')) -
+        new Date(dateB.split('.').reverse().join('-'))
+      )
       .map(([date, tasks]) => ({ date, tasks }));
   }, [groupedTasks]);
 
   return (
-    <View style={globalStyles.main}>
-      <StatusBar barStyle="light-content" backgroundColor="#010a0a" />
+    <View style={[globalStyles.main, { backgroundColor: themeStyles.backgroundColor }]}>
+      <StatusBar
+        barStyle={isDarkTheme ? 'light-content' : 'dark-content'}
+        backgroundColor={themeStyles.backgroundColor}
+      />
       <View style={globalStyles.Header}>
-        <Text style={globalStyles.HeaderText}>
-          {view === 'today' ? 'Сегодня' : view === 'upcoming' ? 'Предстоящее' : 'Прошедшие'}
+        <Text style={[globalStyles.HeaderText, { color: themeStyles.textColor }]}>
+          {view === 'today' ? 'Сегодня' : 'Предстоящее'}
         </Text>
+        <Icon
+          name="settings"
+          size={24}
+          color={themeStyles.textColor}
+          style={{ position: 'absolute', right: 20 }}
+          onPress={() => navigation.navigate('Settings')}
+        />
       </View>
-      {view === 'today' && <Text style={globalStyles.dateText}>{currentDate}</Text>}
+
+      {view === 'today' && <Text style={[globalStyles.dateText, { color: themeStyles.textColor }]}>{currentDate}</Text>}
+
       {view === 'today' ? (
         <FlatList
-          data={filteredTasks}
-          extraData={listOfItems}
+          data={[]}
+          ListHeaderComponent={
+            <View>
+              {(() => {
+                const tasksToday = filteredTasks.filter(task => {
+                  const taskDate = new Date(task.date.split('.').reverse().join('-'));
+                  return taskDate.toDateString() === today.toDateString();
+                });
+
+                const tasksPast = filteredTasks.filter(task => {
+                  const taskDate = new Date(task.date.split('.').reverse().join('-'));
+                  return taskDate < today;
+                });
+
+                return (
+                  <>
+                    {tasksToday.length > 0 && (
+                      <>
+                        <Text style={[globalStyles.upcomingDate, { color: themeStyles.textColor }]}>Сегодня</Text>
+                        {tasksToday.map(task => (
+                          <ListItem
+                            key={task.key}
+                            el={task}
+                            deleteHandler={deleteHandler}
+                            onToggleFavorite={toggleFavoriteHandler}
+                            onEditDate={onEditDate}
+                          />
+                        ))}
+                      </>
+                    )}
+
+                    {tasksPast.length > 0 && (
+                      <>
+                        <Text style={[globalStyles.upcomingDate, { color: themeStyles.textColor }]}>Прошедшие</Text>
+                        {tasksPast.map(task => (
+                          <ListItem
+                            key={task.key}
+                            el={task}
+                            deleteHandler={deleteHandler}
+                            onToggleFavorite={toggleFavoriteHandler}
+                            onEditDate={onEditDate}
+                          />
+                        ))}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </View>
+          }
           ListFooterComponent={<View style={{ height: 125 }} />}
-          renderItem={({ item }) => (
-            <ListItem
-              el={item}
-              deleteHandler={deleteHandler}
-              onToggleFavorite={toggleFavoriteHandler}
-              onEditDate={onEditDate}
-            />
-          )}
-          keyExtractor={(item) => item.key}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={null}
         />
       ) : (
         <FlatList
@@ -151,7 +231,7 @@ export default function Main() {
           ListFooterComponent={<View style={{ height: 125 }} />}
           renderItem={({ item, index }) => (
             <View style={{ marginTop: index === 0 ? 20 : 0 }}>
-              <Text style={globalStyles.upcomingDate}>{item.date}</Text>
+              <Text style={[globalStyles.upcomingDate, { color: themeStyles.textColor }]}>{item.date}</Text>
               {item.tasks.map(task => (
                 <ListItem
                   key={task.key}
@@ -166,6 +246,7 @@ export default function Main() {
           keyExtractor={(item) => item.date}
         />
       )}
+
       <View style={globalStyles.formContainer}>
         <Form addHandler={addHandler} view={view} />
       </View>
@@ -186,6 +267,8 @@ export default function Main() {
           }}
         />
       )}
+
+      <FlashMessage position="top" />
     </View>
   );
 }
