@@ -78,4 +78,58 @@ export const FormStyles = StyleSheet.create({
         width: '100%',
         marginBottom: 20,
     },
+    modalContentMinimal: {
+        backgroundColor: 'white',
+        padding: 20,
+        borderRadius: 16,
+        margin: 30,
+        elevation: 5,
+      },
+      
+      inputMinimal: {
+        fontSize: 18,
+        borderBottomWidth: 1,
+        borderColor: '#ddd',
+        paddingBottom: 8,
+        marginBottom: 20,
+        color: '#333',
+      },
+      
+      dateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+      },
+      
+      iconButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+      },
+      
+      dateText: {
+        marginLeft: 6,
+        fontSize: 16,
+        color: '#555',
+      },
+      
+      clearTimeButton: {
+        padding: 6,
+        marginLeft: 8,
+      },
+      
+      addButtonMinimal: {
+        backgroundColor: '#007AFF',
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+      },
+      
+      addButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
+      },
+      
 });

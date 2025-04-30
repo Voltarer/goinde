@@ -5,6 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import ListItem from '../components/ListItem';
 import Form from '../components/Form';
 import { getCurrentDate } from '../utils/getCurrentDate';
+import { formatDateTime } from '../utils/formatDateTime';
 import BottomNav from '../utils/bottompanel';
 import { globalStyles } from '../styles/styles';
 import Icon from 'react-native-vector-icons/Feather';
@@ -31,7 +32,7 @@ export default function Main() {
           let parsedList = JSON.parse(storedList);
           parsedList = parsedList.map(task => ({
             ...task,
-            date: task.date || new Date().toLocaleDateString('ru-RU'),
+            date: task.date || new Date().toISOString(),
           }));
           setListOfItems(parsedList);
         }
@@ -59,21 +60,17 @@ export default function Main() {
 
   const addHandler = (text, date) => {
     if (!text.trim()) return;
-  
-    const formattedDate =
-      typeof date === 'string'
-        ? date
-        : date.toLocaleDateString('ru-RU');
-  
+
+    const parsedDate = new Date(date);
     const newTask = {
       key: Date.now().toString(),
       text,
-      date: formattedDate,
+      date: parsedDate.toISOString(),
       isFavorite: false,
     };
-  
+
     setListOfItems((prevList) => [...prevList, newTask]);
-  
+
     showMessage({
       message: 'Задача добавлена!',
       description: `"${text}" успешно создана`,
@@ -82,7 +79,6 @@ export default function Main() {
       duration: 1500,
     });
   };
-  
 
   const deleteHandler = (key) => {
     setListOfItems((prevList) => prevList.filter(task => task.key !== key));
@@ -102,10 +98,10 @@ export default function Main() {
   };
 
   const updateTaskDate = (key, newDate) => {
-    const formattedDate = newDate.toLocaleDateString('ru-RU');
+    const isoDate = newDate.toISOString();
     setListOfItems(prevList =>
       prevList.map(task =>
-        task.key === key ? { ...task, date: formattedDate } : task
+        task.key === key ? { ...task, date: isoDate } : task
       )
     );
     setModalVisible(false);
@@ -117,22 +113,22 @@ export default function Main() {
     return listOfItems
       .filter(task => {
         if (!task.date) return false;
-  
-        const taskDate = new Date(task.date.split('.').reverse().join('-'));
+
+        const taskDate = new Date(task.date);
         const isSameDay = taskDate.toDateString() === today.toDateString();
-  
-        if (view === 'today') return isSameDay || taskDate < today;
+
+        if (view === 'today') return isSameDay;
         if (view === 'upcoming') return taskDate > today;
         return true;
       })
       .sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite));
   }, [listOfItems, view]);
-  
 
   const groupedTasks = useMemo(() => {
     const groups = filteredTasks.reduce((acc, task) => {
-      if (!acc[task.date]) acc[task.date] = [];
-      acc[task.date].push(task);
+      const groupKey = new Date(task.date).toISOString();
+      if (!acc[groupKey]) acc[groupKey] = [];
+      acc[groupKey].push(task);
       return acc;
     }, {});
     return groups;
@@ -140,10 +136,7 @@ export default function Main() {
 
   const upcomingList = useMemo(() => {
     return Object.entries(groupedTasks)
-      .sort(([dateA], [dateB]) =>
-        new Date(dateA.split('.').reverse().join('-')) -
-        new Date(dateB.split('.').reverse().join('-'))
-      )
+      .sort(([a], [b]) => new Date(a) - new Date(b))
       .map(([date, tasks]) => ({ date, tasks }));
   }, [groupedTasks]);
 
@@ -166,7 +159,11 @@ export default function Main() {
         />
       </View>
 
-      {view === 'today' && <Text style={[globalStyles.dateText, { color: themeStyles.textColor }]}>{currentDate}</Text>}
+      {view === 'today' && (
+        <Text style={[globalStyles.dateText, { color: themeStyles.textColor }]}>
+          {currentDate}
+        </Text>
+      )}
 
       {view === 'today' ? (
         <FlatList
@@ -174,44 +171,73 @@ export default function Main() {
           ListHeaderComponent={
             <View>
               {(() => {
-                const tasksToday = filteredTasks.filter(task => {
-                  const taskDate = new Date(task.date.split('.').reverse().join('-'));
-                  return taskDate.toDateString() === today.toDateString();
-                });
+                const now = new Date();
 
-                const tasksPast = filteredTasks.filter(task => {
-                  const taskDate = new Date(task.date.split('.').reverse().join('-'));
-                  return taskDate < today;
-                });
+                const tasksToday = filteredTasks
+                  .filter(task => {
+                    const taskDate = new Date(task.date);
+                    return (
+                      taskDate.toDateString() === today.toDateString() &&
+                      taskDate.getTime() >= now.getTime()
+                    );
+                  })
+                  .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                const tasksPast = filteredTasks
+                  .filter(task => {
+                    const taskDate = new Date(task.date);
+                    return (
+                      taskDate.toDateString() === today.toDateString() &&
+                      taskDate.getTime() < now.getTime()
+                    );
+                  })
+                  .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                const formatTime = (iso) => {
+                  const d = new Date(iso);
+                  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                };
 
                 return (
                   <>
                     {tasksToday.length > 0 && (
                       <>
-                        <Text style={[globalStyles.upcomingDate, { color: themeStyles.textColor }]}>Сегодня</Text>
+                        <Text style={[globalStyles.upcomingDate, { color: themeStyles.textColor }]}>
+                          Сегодня
+                        </Text>
                         {tasksToday.map(task => (
-                          <ListItem
-                            key={task.key}
-                            el={task}
-                            deleteHandler={deleteHandler}
-                            onToggleFavorite={toggleFavoriteHandler}
-                            onEditDate={onEditDate}
-                          />
+                          <View key={task.key}>
+                            <Text style={[globalStyles.dateText2, { color: themeStyles.subTextColor }]}>
+                              {formatTime(task.date)}
+                            </Text>
+                            <ListItem
+                              el={task}
+                              deleteHandler={deleteHandler}
+                              onToggleFavorite={toggleFavoriteHandler}
+                              onEditDate={onEditDate}
+                            />
+                          </View>
                         ))}
                       </>
                     )}
 
                     {tasksPast.length > 0 && (
                       <>
-                        <Text style={[globalStyles.upcomingDate, { color: themeStyles.textColor }]}>Прошедшие</Text>
+                        <Text style={[globalStyles.upcomingDate, { color: themeStyles.textColor }]}>
+                          Прошедшие
+                        </Text>
                         {tasksPast.map(task => (
-                          <ListItem
-                            key={task.key}
-                            el={task}
-                            deleteHandler={deleteHandler}
-                            onToggleFavorite={toggleFavoriteHandler}
-                            onEditDate={onEditDate}
-                          />
+                          <View key={task.key}>
+                            <Text style={[globalStyles.dateText2, { color: themeStyles.subTextColor }]}>
+                              {formatTime(task.date)}
+                            </Text>
+                            <ListItem
+                              el={task}
+                              deleteHandler={deleteHandler}
+                              onToggleFavorite={toggleFavoriteHandler}
+                              onEditDate={onEditDate}
+                            />
+                          </View>
                         ))}
                       </>
                     )}
@@ -231,7 +257,9 @@ export default function Main() {
           ListFooterComponent={<View style={{ height: 125 }} />}
           renderItem={({ item, index }) => (
             <View style={{ marginTop: index === 0 ? 20 : 0 }}>
-              <Text style={[globalStyles.upcomingDate, { color: themeStyles.textColor }]}>{item.date}</Text>
+              <Text style={[globalStyles.upcomingDate, { color: themeStyles.textColor }]}>
+                {formatDateTime(item.date)}
+              </Text>
               {item.tasks.map(task => (
                 <ListItem
                   key={task.key}

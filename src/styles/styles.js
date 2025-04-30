@@ -68,5 +68,12 @@ export const globalStyles = StyleSheet.create({
     fontSize: 16, // Чуть крупнее для читабельности
     marginTop: 10, // Отступ сверху (дополнительно)
     marginLeft: 10, // Отступ слева
-  }
+  },
+  dateText2: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'left',
+    color: 'white',
+    paddingLeft:20,
+  },
 });
