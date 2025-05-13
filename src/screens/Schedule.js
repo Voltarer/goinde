@@ -1,144 +1,182 @@
-import React, { useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, ActivityIndicator, Text, ScrollView, Button } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { useRoute } from '@react-navigation/native';
+import { globalStyles } from '../styles/styles';
+import cheerio from 'cheerio-without-node-native';
 
 export default function Schedule() {
-  const [schedule, setSchedule] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [webViewKey, setWebViewKey] = useState(0);
-  const webViewRef = useRef(null);
-  const navigation = useNavigation();
-  const { isDarkTheme, toggleTheme } = useTheme();
+  const { isDarkTheme } = useTheme();
+  const webviewRef = useRef(null);
+  const [status, setStatus] = useState('Загрузка...');
+  const [hasInjected, setHasInjected] = useState(false);
+  const [tbodyContent, setTbodyContent] = useState('');
+  const [filteredContent, setFilteredContent] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [currentWeekInfo, setCurrentWeekInfo] = useState('');
 
-  // Скрипт: кликаем по вкладке и парсим расписание
-  const clickAndParseScript = `
+  const route = useRoute();
+  const { login, password } = route.params || {};
+
+  const injectedScript = `
     (function() {
-      const tab = document.getElementById('ui-id-3');
-      if (tab) {
-        tab.click();
-        setTimeout(() => {
-          const table = document.querySelector('table');
-          const rows = Array.from(table?.querySelectorAll('tr')).slice(1);
-          const data = rows
-            .map(row => {
-              const cells = row.querySelectorAll('td');
-              return {
-                time: cells[0]?.innerText.trim() || '',
-                subject: cells[1]?.innerText.trim() || ''
-              };
-            })
-            .filter(item => item.time && item.subject);
-          window.ReactNativeWebView.postMessage(JSON.stringify(data));
-        }, 1000);
+      const loginField = document.getElementById('wname');
+      const passField = document.getElementById('wpass');
+      const loginButton = document.getElementById('auth');
+
+      function goToSchedule() {
+        window.location.href = 'https://tt.chuvsu.ru/index/grouptt/gr/7377';
+        window.ReactNativeWebView.postMessage("✅ Перешли на расписание группы напрямую");
+      }
+
+      if (loginField && passField && loginButton) {
+        loginField.value = "${login}";
+        passField.value = "${password}";
+        loginButton.click();
+        setTimeout(goToSchedule, 7000);
+        window.ReactNativeWebView.postMessage("🔐 Выполнен вход, ожидаем переход");
       } else {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ error: "Вкладка не найдена" }));
+        goToSchedule();
+        window.ReactNativeWebView.postMessage("ℹ️ Уже авторизован, переходим на расписание");
       }
     })();
     true;
   `;
 
-  // Выполняем при повторном входе на экран
-  useFocusEffect(
-    useCallback(() => {
-      setWebViewKey(prev => prev + 1);
-      setLoading(true);
-    }, [])
-  );
-
-  // Ручное обновление расписания
-  const refreshSchedule = () => {
-    setLoading(true);
-    webViewRef.current?.injectJavaScript(clickAndParseScript);
-  };
-
-  // Обработка сообщения от WebView
-  const handleMessage = (event) => {
-    try {
-      const parsed = JSON.parse(event.nativeEvent.data);
-      if (parsed.error) {
-        console.error(parsed.error);
-        setSchedule([]);
+  const extractTbodyScript = `
+    (function() {
+      const tbody = document.querySelector('tbody[role="alert"]');
+      const weekInfo = document.querySelector('p');
+      if (tbody) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          tbody: tbody.innerHTML,
+          week: weekInfo ? weekInfo.innerText : ""
+        }));
       } else {
-        setSchedule(parsed);
+        window.ReactNativeWebView.postMessage(JSON.stringify({ error: "tbody не найден" }));
       }
-    } catch (e) {
-      console.error('Ошибка парсинга:', e);
-      setSchedule([]);
-    } finally {
-      setLoading(false);
+    })();
+    true;
+  `;
+
+  const handleWebViewLoad = ({ nativeEvent }) => {
+    const url = nativeEvent.url;
+
+    if (!hasInjected && webviewRef.current) {
+      webviewRef.current.injectJavaScript(injectedScript);
+      setHasInjected(true);
+    }
+
+    if (url.includes('/grouptt/gr/7377') && webviewRef.current) {
+      setTimeout(() => {
+        webviewRef.current.injectJavaScript(extractTbodyScript);
+      }, 3000);
     }
   };
 
+  const handleMessage = (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.tbody) {
+        setTbodyContent(data.tbody);
+        setCurrentWeekInfo(data.week || '');
+        setStatus("📋 Расписание загружено");
+        applyFilter(data.tbody, filterType);
+      } else if (data.error) {
+        setStatus(`⚠️ ${data.error}`);
+      }
+    } catch (e) {
+      setStatus(event.nativeEvent.data);
+    }
+  };
+
+  const applyFilter = (html, type) => {
+    const $ = cheerio.load(`<table><tbody>${html}</tbody></table>`);
+    const rows = $('tr');
+    const results = [];
+    let currentDay = '';
+    let pairNumber = 1;
+
+    rows.each((i, row) => {
+      const pairInfo = $(row).find('.trfd').text().trim();
+      const pairContent = $(row).find('.want').html() || '';
+
+      const hasOdd = pairContent.includes('<sup>*</sup>');
+      const hasEven = pairContent.includes('<sup>**</sup>');
+
+      const show =
+        type === 'all' ||
+        (type === 'odd' && hasOdd) ||
+        (type === 'even' && hasEven);
+
+      if (show) {
+        const rawDay = $(row).prevAll('tr').find('.trfd').first().text();
+        const dayOfWeek = getDayOfWeek(rawDay) || currentDay;
+        currentDay = dayOfWeek;
+
+        const cleanText = $(row).text().replace(/\s+/g, ' ').trim();
+
+        results.push(`=== ${dayOfWeek} ===\n${pairNumber} пара: ${cleanText}`);
+        pairNumber++;
+      }
+    });
+
+    setFilteredContent(results.length ? results.join('\n\n') : 'Нет пар для выбранной недели');
+  };
+
+  const getDayOfWeek = (text) => {
+    const days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+    for (const day of days) {
+      if (text.includes(day)) return day;
+    }
+    return null;
+  };
+
+  const handleFilterChange = (type) => {
+    setFilterType(type);
+    applyFilter(tbodyContent, type);
+  };
+
   return (
-    <View style={{ flex: 1 ,backgroundColor: isDarkTheme ? '#121212' : '#F9F9F9' ,color: isDarkTheme ? '#fff' : '#000'}}>
-      <View style={styles.tabContainer}>
-        <TouchableOpacity onPress={refreshSchedule} style={styles.tabButton}>
-          <Text style={styles.tabText}>Обновить расписание</Text>
-        </TouchableOpacity>
+    <View style={[globalStyles.main, { backgroundColor: isDarkTheme ? '#121212' : '#FFFFFF', flex: 1 }]}>
+      <Text style={[globalStyles.HeaderText, { color: isDarkTheme ? '#fff' : '#000', marginBottom: 10 }]}>
+        Расписание
+      </Text>
+
+      <Text style={{ marginBottom: 10, color: isDarkTheme ? '#ccc' : '#333' }}>
+        {status}
+      </Text>
+
+      {currentWeekInfo ? (
+        <Text style={{ color: isDarkTheme ? '#aaa' : '#555', marginBottom: 10 }}>
+          📆 {currentWeekInfo}
+        </Text>
+      ) : null}
+
+      <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 10 }}>
+        <Button title="Показать всё" onPress={() => handleFilterChange('all')} />
+        <Button title="(*)" onPress={() => handleFilterChange('odd')} />
+        <Button title="(**)" onPress={() => handleFilterChange('even')} />
       </View>
 
-      {loading && <ActivityIndicator size="large" style={{ marginTop: 20 }} />}
-
-      <WebView
-        key={webViewKey}
-        ref={webViewRef}
-        source={{ uri: 'https://lk.chuvsu.ru/student/tt.php' }}
-        javaScriptEnabled
-        onMessage={handleMessage}
-        onLoadEnd={() => {
-          // Кликаем по нужной вкладке и парсим после полной загрузки страницы
-          webViewRef.current?.injectJavaScript(clickAndParseScript);
-        }}
-        style={{ height: 0, width: 0 }}
-      />
-
-      {!loading && (
-        <FlatList
-          data={schedule}
-          keyExtractor={(_, index) => index.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Text style={styles.time}>{item.time}</Text>
-              <Text style={styles.subject}>{item.subject}</Text>
-            </View>
-          )}
+      {filteredContent ? (
+        <ScrollView style={{ flex: 1 }}>
+          <View style={{ padding: 10 }}>
+            <Text style={{ color: isDarkTheme ? '#fff' : '#000' }}>{filteredContent}</Text>
+          </View>
+        </ScrollView>
+      ) : (
+        <WebView
+          ref={webviewRef}
+          source={{ uri: 'https://tt.chuvsu.ru' }}
+          javaScriptEnabled
+          domStorageEnabled
+          onLoadEnd={handleWebViewLoad}
+          onMessage={handleMessage}
+          style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }}
         />
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  tabContainer: {
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-  },
-  tabButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#4682B4',
-    borderRadius: 10,
-  },
-  tabText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  item: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-  },
-  time: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#444',
-  },
-  subject: {
-    fontSize: 16,
-    color: '#000',
-  },
-});

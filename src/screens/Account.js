@@ -117,7 +117,7 @@ export default function Account() {
       {isLoggedIn && (
         <TouchableOpacity
           style={[globalStyles.button, { marginTop: 20,color: isDarkTheme ? '#fff' : '#000'  }]}
-          onPress={() => navigation.navigate('Schedule')}
+          onPress={() => navigation.navigate('Schedule', { login, password })}
         >
           <Text style={[globalStyles.buttonText,{color: isDarkTheme ? '#fff' : '#000' }]}>Посмотреть расписание</Text>
         </TouchableOpacity>
