@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
 import { globalStyles } from '../styles/styles';
@@ -7,14 +7,19 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 
 export default function Account() {
-  const { isDarkTheme, toggleTheme } = useTheme();
+  const { isDarkTheme } = useTheme();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
   const [webViewVisible, setWebViewVisible] = useState(false);
   const [hasInjected, setHasInjected] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [groupName, setGroupName] = useState('');
+  const [loadPersonalData, setLoadPersonalData] = useState(false);
   const webviewRef = useRef(null);
+  const personalDataRef = useRef(null);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -73,56 +78,109 @@ export default function Account() {
     setStatus(msg);
     if (msg.includes('✅')) {
       setIsLoggedIn(true);
-      setWebViewVisible(false); // скрыть после авторизации
+      setWebViewVisible(false);
+      setLoadPersonalData(true); // запускаем парсинг ФИО и фото
     }
   };
 
+  const handlePersonalDataLoad = () => {
+    const jsParse = `
+      (function() {
+        const photo = document.getElementById('id_face')?.getAttribute('src') || '';
+        const fam = document.getElementById('id_fam')?.value || '';
+        const nam = document.getElementById('id_nam')?.value || '';
+        const oth = document.getElementById('id_oth')?.value || '';
+        const group = document.getElementById('id_groupname')?.value || '';
+        const data = { photo, fam, nam, oth, group };
+        window.ReactNativeWebView.postMessage(JSON.stringify(data));
+      })();
+      true;
+    `;
+    personalDataRef.current?.injectJavaScript(jsParse);
+  };
+
+  const handlePersonalDataMessage = (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('Parsed data:', data);
+
+      const path = data.photo.startsWith('/') ? data.photo.slice(1) : data.photo;
+      setPhotoUrl(`https://lk.chuvsu.ru/${path}`);
+      setFullName(`${data.fam} ${data.nam} ${data.oth}`);
+      setGroupName(data.group);
+    } catch (e) {
+      console.log('Ошибка парсинга данных:', e);
+    }
+    setLoadPersonalData(false);
+  };
+
   return (
-    <View style={[globalStyles.main,{ padding: 20,backgroundColor: isDarkTheme ? '#121212' : '#F9F9F9' ,color: isDarkTheme ? '#fff' : '#000' }]}>
-      <Text style={[globalStyles.HeaderText,{ marginBottom: 10,color: isDarkTheme ? '#fff' : '#000'  }]}>Аккаунт</Text>
+    <View style={[globalStyles.main, { padding: 20, backgroundColor: isDarkTheme ? '#121212' : '#F9F9F9' }]}>
+      <Text style={[globalStyles.HeaderText, { marginBottom: 10, color: isDarkTheme ? '#fff' : '#000' }]}>Аккаунт</Text>
 
-      <TextInput
-        style={[globalStyles.input2, {fontSize:20,color: isDarkTheme ? '#fff' : '#000' }]}
-        placeholder="Логин"
-        value={login}
-        onChangeText={(text) => {
-          setLogin(text);
-          setStatus('');
-        }}
-      />
-      <TextInput
-        style={[globalStyles.input2, {fontSize:20,color: isDarkTheme ? '#fff' : '#000' }]}
-        placeholder="Пароль"
-        secureTextEntry
-        value={password}
-        onChangeText={(text) => {
-          setPassword(text);
-          setStatus('');
-        }}
-      />
-
-      <TouchableOpacity style={globalStyles.button} onPress={handleLogin}>
-        <Text style={[globalStyles.buttonText,{color: isDarkTheme ? '#fff' : '#000' }]}>Войти в кабинет</Text>
-      </TouchableOpacity>
+      {!isLoggedIn && (
+        <>
+          <TextInput
+            style={[globalStyles.input2, { fontSize: 20, color: isDarkTheme ? '#fff' : '#000' }]}
+            placeholder="Логин"
+            value={login}
+            onChangeText={(text) => {
+              setLogin(text);
+              setStatus('');
+            }}
+          />
+          <TextInput
+            style={[globalStyles.input2, { fontSize: 20, color: isDarkTheme ? '#fff' : '#000' }]}
+            placeholder="Пароль"
+            secureTextEntry
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              setStatus('');
+            }}
+          />
+          <TouchableOpacity style={globalStyles.button} onPress={handleLogin}>
+            <Text style={[globalStyles.buttonText, { color: isDarkTheme ? '#fff' : '#000' }]}>Войти в кабинет</Text>
+          </TouchableOpacity>
+        </>
+      )}
 
       {status === 'Вход...' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
           <ActivityIndicator size="small" color="#007AFF" />
-          <Text style={{ marginLeft: 10 }}>{status}</Text>
+          <Text style={{ marginLeft: 10, color: isDarkTheme ? '#fff' : '#000' }}>{status}</Text>
         </View>
       ) : (
-        status !== '' && <Text style={{ marginTop: 10,color: isDarkTheme ? '#fff' : '#000'  }}>{status}</Text>
+        status !== '' && <Text style={{ marginTop: 10, color: isDarkTheme ? '#fff' : '#000' }}>{status}</Text>
       )}
 
       {isLoggedIn && (
-        <TouchableOpacity
-          style={[globalStyles.button, { marginTop: 20,color: isDarkTheme ? '#fff' : '#000'  }]}
-          onPress={() => navigation.navigate('Schedule', { login, password })}
-        >
-          <Text style={[globalStyles.buttonText,{color: isDarkTheme ? '#fff' : '#000' }]}>Посмотреть расписание</Text>
-        </TouchableOpacity>
+        <>
+          {fullName !== '' && (
+            <View style={{ alignItems: 'center', marginVertical: 20 }}>
+              <Text style={{ fontSize: 18, marginBottom: 5, color: isDarkTheme ? '#fff' : '#000' }}>{fullName}</Text>
+              {groupName !== '' && (
+                <Text style={{ fontSize: 16, marginBottom: 10, color: isDarkTheme ? '#aaa' : '#555' }}>Группа: {groupName}</Text>
+              )}
+              {photoUrl !== '' && (
+                <Image
+                  source={{ uri: photoUrl }}
+                  style={{ width: 200, height: 200, borderRadius: 10, backgroundColor: '#ccc' }}
+                />
+              )}
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[globalStyles.button, { marginTop: 20 }]}
+            onPress={() => navigation.navigate('Schedule', { login, password })}
+          >
+            <Text style={[globalStyles.buttonText, { color: isDarkTheme ? '#fff' : '#000' }]}>Посмотреть расписание</Text>
+          </TouchableOpacity>
+        </>
       )}
 
+      {/* WebView для авторизации */}
       {webViewVisible && (
         <WebView
           ref={webviewRef}
@@ -131,7 +189,20 @@ export default function Account() {
           domStorageEnabled
           onLoadEnd={handleWebViewLoad}
           onMessage={handleMessage}
-          style={{ width: 0, height: 0 }} // скрыто
+          style={{ width: 0, height: 0 }}
+        />
+      )}
+
+      {/* WebView для парсинга ФИО и фото */}
+      {loadPersonalData && (
+        <WebView
+          ref={personalDataRef}
+          source={{ uri: 'https://lk.chuvsu.ru/student/personal_data.php' }}
+          javaScriptEnabled
+          domStorageEnabled
+          onLoadEnd={handlePersonalDataLoad}
+          onMessage={handlePersonalDataMessage}
+          style={{ width: 0, height: 0 }}
         />
       )}
     </View>

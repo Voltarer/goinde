@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, FlatList, Text, StatusBar } from 'react-native';
+import {
+  View,
+  FlatList,
+  Text,
+  StatusBar,
+  Modal,
+  TouchableOpacity,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import ListItem from '../components/ListItem';
@@ -20,6 +27,7 @@ export default function Main() {
   const [editTaskKey, setEditTaskKey] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [introVisible, setIntroVisible] = useState(false); // Модалка приветствия
 
   const navigation = useNavigation();
   const { isDarkTheme, themeStyles } = useTheme();
@@ -41,8 +49,20 @@ export default function Main() {
       }
     };
 
+    const checkIntroShown = async () => {
+      try {
+        // const hasShown = await AsyncStorage.getItem('introShown');
+        // if (!hasShown) {
+          setIntroVisible(true);
+        // }
+      } catch (error) {
+        console.error('Ошибка при проверке introShown:', error);
+      }
+    };
+
     loadData();
     setCurrentDate(getCurrentDate());
+    checkIntroShown();
   }, []);
 
   useEffect(() => {
@@ -139,6 +159,11 @@ export default function Main() {
       .sort(([a], [b]) => new Date(a) - new Date(b))
       .map(([date, tasks]) => ({ date, tasks }));
   }, [groupedTasks]);
+
+  const closeIntro = async () => {
+    setIntroVisible(false);
+    await AsyncStorage.setItem('introShown', 'true');
+  };
 
   return (
     <View style={[globalStyles.main, { backgroundColor: themeStyles.backgroundColor }]}>
@@ -297,6 +322,54 @@ export default function Main() {
       )}
 
       <FlashMessage position="top" />
+
+      {/* Модальное окно приветствия */}
+      <Modal
+        visible={introVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeIntro}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <View style={{
+            backgroundColor: 'white',
+            padding: 20,
+            borderRadius: 20,
+            width: '80%',
+            alignItems: 'center'
+          }}>
+            <Text style={{ fontSize: 16, marginBottom: 15 }}>
+              Добро пожаловать!
+            </Text>
+            <Text style={{ fontSize: 16, marginBottom: 15 }}>
+              Обновление 3.0.0
+            </Text>
+            <View style={{ alignItems: 'flex-start', marginLeft: 10 }}>
+              <Text style={{ fontSize: 15, marginBottom: 5 }}>• Обновленнный дизайн добавления задачи</Text>
+              <Text style={{ fontSize: 15, marginBottom: 5 }}>• Новый дизайн Аккаунта(Вывели ФИО,группу и фото)</Text>
+              <Text style={{ fontSize: 15, marginBottom: 5 }}>• Уведомление о Обновление</Text>
+              <Text style={{ fontSize: 15, marginBottom: 5 }}>• Ваня ЛОХ</Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={closeIntro}
+              style={{
+                backgroundColor: '#2196F3',
+                paddingVertical: 10,
+                paddingHorizontal: 20,
+                borderRadius: 10,
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 16 }}>Понятно</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
