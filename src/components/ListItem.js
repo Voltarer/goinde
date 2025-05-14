@@ -74,7 +74,7 @@ export default function ListItem({ el, deleteHandler, onToggleFavorite, onEditDa
         <Text
           style={[
             globalStyles.text,
-            { color: themeStyles.textColor },
+            { color: themeStyles.textColor},
             isCompleted && { textDecorationLine: 'line-through', opacity: 0.6 },
           ]}
         >

@@ -51,10 +51,10 @@ export default function Main() {
 
     const checkIntroShown = async () => {
       try {
-        // const hasShown = await AsyncStorage.getItem('introShown');
-        // if (!hasShown) {
+        const hasShown = await AsyncStorage.getItem('introShown');
+        if (!hasShown) {
           setIntroVisible(true);
-        // }
+        }
       } catch (error) {
         console.error('Ошибка при проверке introShown:', error);
       }
@@ -232,7 +232,7 @@ export default function Main() {
                         </Text>
                         {tasksToday.map(task => (
                           <View key={task.key}>
-                            <Text style={[globalStyles.dateText2, { color: themeStyles.subTextColor }]}>
+                            <Text style={[globalStyles.dateText2, { color: themeStyles.textColor }]}>
                               {formatTime(task.date)}
                             </Text>
                             <ListItem
@@ -253,7 +253,7 @@ export default function Main() {
                         </Text>
                         {tasksPast.map(task => (
                           <View key={task.key}>
-                            <Text style={[globalStyles.dateText2, { color: themeStyles.subTextColor }]}>
+                            <Text style={[globalStyles.dateText2, { color: themeStyles.textColor }]}>
                               {formatTime(task.date)}
                             </Text>
                             <ListItem

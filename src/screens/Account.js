@@ -16,20 +16,35 @@ export default function Account() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [photoUrl, setPhotoUrl] = useState('');
   const [fullName, setFullName] = useState('');
-  const [groupName, setGroupName] = useState('');
   const [loadPersonalData, setLoadPersonalData] = useState(false);
   const webviewRef = useRef(null);
   const personalDataRef = useRef(null);
   const navigation = useNavigation();
 
+  // Загрузка сохранённых данных
   useEffect(() => {
-    const loadCredentials = async () => {
-      const savedLogin = await AsyncStorage.getItem('login');
-      const savedPassword = await AsyncStorage.getItem('password');
-      if (savedLogin) setLogin(savedLogin);
-      if (savedPassword) setPassword(savedPassword);
+    const loadCachedData = async () => {
+      try {
+        const savedLogin = await AsyncStorage.getItem('login');
+        const savedPassword = await AsyncStorage.getItem('password');
+        const savedFullName = await AsyncStorage.getItem('fullName');
+        const savedPhotoUrl = await AsyncStorage.getItem('photoUrl');
+
+        if (savedLogin && savedPassword) {
+          setLogin(savedLogin);
+          setPassword(savedPassword);
+          if (savedFullName && savedPhotoUrl) {
+            setFullName(savedFullName);
+            setPhotoUrl(savedPhotoUrl);
+            setIsLoggedIn(true);
+          }
+        }
+      } catch (error) {
+        console.log('Ошибка загрузки кэшированных данных', error);
+      }
     };
-    loadCredentials();
+
+    loadCachedData();
   }, []);
 
   const saveCredentials = async () => {
@@ -79,39 +94,67 @@ export default function Account() {
     if (msg.includes('✅')) {
       setIsLoggedIn(true);
       setWebViewVisible(false);
-      setLoadPersonalData(true); // запускаем парсинг ФИО и фото
+      setLoadPersonalData(true);
     }
   };
 
   const handlePersonalDataLoad = () => {
     const jsParse = `
-      (function() {
-        const photo = document.getElementById('id_face')?.getAttribute('src') || '';
+      (async function() {
         const fam = document.getElementById('id_fam')?.value || '';
         const nam = document.getElementById('id_nam')?.value || '';
         const oth = document.getElementById('id_oth')?.value || '';
         const group = document.getElementById('id_groupname')?.value || '';
-        const data = { photo, fam, nam, oth, group };
-        window.ReactNativeWebView.postMessage(JSON.stringify(data));
+
+        const img = document.getElementById('id_face');
+        if (img) {
+          try {
+            const response = await fetch(img.src);
+            const blob = await response.blob();
+            const reader = new FileReader();
+            reader.onloadend = function() {
+              const base64data = reader.result;
+              const data = { fam, nam, oth, group, photo: base64data };
+              window.ReactNativeWebView.postMessage(JSON.stringify(data));
+            };
+            reader.readAsDataURL(blob);
+          } catch (e) {
+            const data = { fam, nam, oth, group, photo: '' };
+            window.ReactNativeWebView.postMessage(JSON.stringify(data));
+          }
+        } else {
+          const data = { fam, nam, oth, group, photo: '' };
+          window.ReactNativeWebView.postMessage(JSON.stringify(data));
+        }
       })();
       true;
     `;
     personalDataRef.current?.injectJavaScript(jsParse);
   };
 
-  const handlePersonalDataMessage = (event) => {
+  const handlePersonalDataMessage = async (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      console.log('Parsed data:', data);
+      const fullNameStr = `${data.fam} ${data.nam} ${data.oth} (${data.group})`;
+      setPhotoUrl(data.photo);
+      setFullName(fullNameStr);
 
-      const path = data.photo.startsWith('/') ? data.photo.slice(1) : data.photo;
-      setPhotoUrl(`https://lk.chuvsu.ru/${path}`);
-      setFullName(`${data.fam} ${data.nam} ${data.oth}`);
-      setGroupName(data.group);
+      await AsyncStorage.setItem('fullName', fullNameStr);
+      await AsyncStorage.setItem('photoUrl', data.photo);
     } catch (e) {
       console.log('Ошибка парсинга данных:', e);
     }
     setLoadPersonalData(false);
+  };
+
+  const handleLogout = async () => {
+    await AsyncStorage.clear();
+    setIsLoggedIn(false);
+    setLogin('');
+    setPassword('');
+    setFullName('');
+    setPhotoUrl('');
+    setStatus('');
   };
 
   return (
@@ -140,7 +183,7 @@ export default function Account() {
             }}
           />
           <TouchableOpacity style={globalStyles.button} onPress={handleLogin}>
-            <Text style={[globalStyles.buttonText, { color: isDarkTheme ? '#fff' : '#000' }]}>Войти в кабинет</Text>
+            <Text style={[globalStyles.buttonText, { marginTop: 20,color: isDarkTheme ? '#fff' : '#000' }]}>Войти в кабинет</Text>
           </TouchableOpacity>
         </>
       )}
@@ -158,29 +201,32 @@ export default function Account() {
         <>
           {fullName !== '' && (
             <View style={{ alignItems: 'center', marginVertical: 20 }}>
-              <Text style={{ fontSize: 18, marginBottom: 5, color: isDarkTheme ? '#fff' : '#000' }}>{fullName}</Text>
-              {groupName !== '' && (
-                <Text style={{ fontSize: 16, marginBottom: 10, color: isDarkTheme ? '#aaa' : '#555' }}>Группа: {groupName}</Text>
-              )}
+              <Text style={{ fontSize: 18, marginBottom: 10, color: isDarkTheme ? '#fff' : '#000' }}>{fullName}</Text>
               {photoUrl !== '' && (
                 <Image
                   source={{ uri: photoUrl }}
-                  style={{ width: 200, height: 200, borderRadius: 10, backgroundColor: '#ccc' }}
+                  style={{ width: 200, height: 200, borderRadius: 10 }}
                 />
               )}
             </View>
           )}
 
           <TouchableOpacity
-            style={[globalStyles.button, { marginTop: 20 }]}
+            style={[globalStyles.button, { marginTop: 10 }]}
             onPress={() => navigation.navigate('Schedule', { login, password })}
           >
             <Text style={[globalStyles.buttonText, { color: isDarkTheme ? '#fff' : '#000' }]}>Посмотреть расписание</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[globalStyles.button, { marginTop: 20, }]}
+            onPress={handleLogout}
+          >
+            <Text style={[globalStyles.buttonText, { color: '#fff' }]}>Выйти</Text>
+          </TouchableOpacity>
         </>
       )}
 
-      {/* WebView для авторизации */}
       {webViewVisible && (
         <WebView
           ref={webviewRef}
@@ -193,7 +239,6 @@ export default function Account() {
         />
       )}
 
-      {/* WebView для парсинга ФИО и фото */}
       {loadPersonalData && (
         <WebView
           ref={personalDataRef}

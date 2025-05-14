@@ -48,9 +48,11 @@ export const globalStyles = StyleSheet.create({
     color:'white',
   },
   text: {
-    fontSize: 24,
+    fontSize: 20,
     flexWrap: 'wrap',
     color:'white',
+    flex: 1,
+    width: '95%'
   },
   circle: {
     width: 20,
@@ -73,7 +75,6 @@ export const globalStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     textAlign: 'left',
-    color: 'white',
     paddingLeft:20,
   },
 });
